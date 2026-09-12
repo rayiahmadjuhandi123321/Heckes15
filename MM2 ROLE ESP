@@ -1,0 +1,256 @@
+-- MM2 ROLE ESP - HECKES 15 (SINGKAT)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local C = {MurdererESP=true, SheriffESP=true, InnocentESP=true, GunESP=true, Notif=true}
+local espFolder, notifGui, lastRoles = nil, nil, {}
+
+-- ===== INTRO =====
+local function intro(cb)
+    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
+    local bg=Instance.new("Frame",g); bg.Size=UDim2.new(1,0,1,0); bg.BackgroundColor3=Color3.new(0,0,0); bg.BorderSizePixel=0
+    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120); t.Position=UDim2.new(0,0,0.5,-60)
+    t.BackgroundTransparency=1; t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150)
+    t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
+    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30); s.Position=UDim2.new(0,0,0.5,80)
+    s.BackgroundTransparency=1; s.Text="MM2 ROLE ESP"; s.TextColor3=Color3.fromRGB(200,200,200)
+    s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
+    TweenService:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play()
+    task.wait(0.3); TweenService:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
+    task.wait(0.7); TweenService:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play()
+    task.wait(0.15); TweenService:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
+    task.wait(1.2)
+    TweenService:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
+    TweenService:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    TweenService:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    task.wait(0.6); g:Destroy(); cb()
+end
+
+-- ===== FUNGSI ROLE =====
+local function getRole(plr)
+    if not plr or not plr.Character then return "Innocent" end
+    local char = plr.Character
+    local backpack = plr:FindFirstChild("Backpack")
+    -- Cek Murderer (pegang knife)
+    if char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife")) then
+        return "Murderer"
+    end
+    -- Cek Sheriff (pegang gun)
+    if char:FindFirstChild("Gun") or char:FindFirstChild("Revolver") or (backpack and (backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver"))) then
+        return "Sheriff"
+    end
+    return "Innocent"
+end
+
+local function getRoleColor(role)
+    if role == "Murderer" then return Color3.fromRGB(255,0,0)
+    elseif role == "Sheriff" then return Color3.fromRGB(0,100,255)
+    else return Color3.fromRGB(0,255,0) end
+end
+
+-- ===== ESP =====
+local function clearESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            local old = p.Character:FindFirstChild("HeckesESP")
+            if old then old:Destroy() end
+        end
+    end
+    if espFolder then espFolder:Destroy(); espFolder = nil end
+end
+
+local function updateESP()
+    if not C.MurdererESP and not C.SheriffESP and not C.InnocentESP then
+        clearESP(); return
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local role = getRole(p)
+            local show = (role == "Murderer" and C.MurdererESP) or (role == "Sheriff" and C.SheriffESP) or (role == "Innocent" and C.InnocentESP)
+            local old = p.Character:FindFirstChild("HeckesESP")
+            if old then old:Destroy() end
+            if hrp and show then
+                local color = getRoleColor(role)
+                local bb = Instance.new("BillboardGui", p.Character); bb.Name = "HeckesESP"
+                bb.Size = UDim2.new(0, 60, 0, 60); bb.AlwaysOnTop = true; bb.Adornee = hrp
+                local fr = Instance.new("Frame", bb); fr.Size = UDim2.new(1, 0, 1, 0)
+                fr.BackgroundTransparency = 1
+                local st = Instance.new("UIStroke", fr); st.Color = color; st.Thickness = 2
+                local nm = Instance.new("TextLabel", bb); nm.Size = UDim2.new(1, 0, 0, 18)
+                nm.Position = UDim2.new(0, 0, 1, 2); nm.BackgroundTransparency = 1
+                nm.Text = role .. " | " .. p.Name; nm.TextColor3 = color
+                nm.TextScaled = true; nm.Font = Enum.Font.GothamBold; nm.TextStrokeTransparency = 0
+            end
+        end
+    end
+end
+
+-- ===== NOTIFIKASI =====
+local function setupNotif()
+    notifGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+    notifGui.Name = "MM2Notif"; notifGui.ResetOnSpawn = false; notifGui.DisplayOrder = 100
+end
+
+local function sendNotif(text, color)
+    if not notifGui then return end
+    local fr = Instance.new("Frame", notifGui)
+    fr.Size = UDim2.new(0, 250, 0, 40); fr.Position = UDim2.new(0.5, -125, 0, 60)
+    fr.BackgroundColor3 = Color3.fromRGB(20, 20, 30); fr.BorderSizePixel = 0
+    Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+    local st = Instance.new("UIStroke", fr); st.Color = color; st.Thickness = 2
+    local tl = Instance.new("TextLabel", fr); tl.Size = UDim2.new(1, 0, 1, 0)
+    tl.BackgroundTransparency = 1; tl.Text = text; tl.TextColor3 = color
+    tl.TextScaled = true; tl.Font = Enum.Font.GothamBold
+    task.spawn(function()
+        TweenService:Create(fr, TweenInfo.new(0.3), {Position = UDim2.new(0.5, -125, 0, 110)}):Play()
+        task.wait(3)
+        TweenService:Create(fr, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(tl, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+        task.wait(0.4); fr:Destroy()
+    end)
+end
+
+-- Loop cek role berubah
+task.spawn(function()
+    while task.wait(1) do
+        if not C.Notif then continue end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character then
+                local role = getRole(p)
+                if lastRoles[p] and lastRoles[p] ~= role then
+                    sendNotif(p.Name .. " -> " .. role, getRoleColor(role))
+                end
+                lastRoles[p] = role
+            end
+        end
+        -- Cek Murderer & Sheriff baru
+        local murderer, sheriff = nil, nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character then
+                local r = getRole(p)
+                if r == "Murderer" then murderer = p end
+                if r == "Sheriff" then sheriff = p end
+            end
+        end
+        if murderer and not lastRoles["_murderer"] then
+            sendNotif("🔪 Murderer: " .. murderer.Name, Color3.fromRGB(255,0,0))
+        end
+        if sheriff and not lastRoles["_sheriff"] then
+            sendNotif("🔫 Sheriff: " .. sheriff.Name, Color3.fromRGB(0,100,255))
+        end
+        lastRoles["_murderer"] = murderer
+        lastRoles["_sheriff"] = sheriff
+    end
+end)
+
+-- ===== TOGGLE =====
+local toggleRefs = {}
+local function createToggle(parent, order, label, key, callback)
+    local row = Instance.new("Frame", parent); row.Size = UDim2.new(1, -12, 0, 36)
+    row.BackgroundColor3 = Color3.fromRGB(35, 35, 50); row.BorderSizePixel = 0; row.LayoutOrder = order
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+    local lb = Instance.new("TextLabel", row); lb.Size = UDim2.new(0.65, 0, 1, 0); lb.Position = UDim2.new(0, 10, 0, 0)
+    lb.BackgroundTransparency = 1; lb.Text = label; lb.TextColor3 = Color3.fromRGB(230, 230, 230)
+    lb.TextScaled = true; lb.Font = Enum.Font.Gotham; lb.TextXAlignment = Enum.TextXAlignment.Left
+    local sw = Instance.new("Frame", row); sw.Size = UDim2.new(0, 46, 0, 24); sw.Position = UDim2.new(1, -56, 0.5, -12)
+    sw.BackgroundColor3 = Color3.fromRGB(80, 40, 40); sw.BorderSizePixel = 0
+    Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
+    local kn = Instance.new("Frame", sw); kn.Size = UDim2.new(0, 18, 0, 18); kn.Position = UDim2.new(0, 3, 0.5, -9)
+    kn.BackgroundColor3 = Color3.new(1, 1, 1); kn.BorderSizePixel = 0
+    Instance.new("UICorner", kn).CornerRadius = UDim.new(1, 0)
+    local btn = Instance.new("TextButton", row); btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1; btn.Text = ""; btn.ZIndex = 5
+    toggleRefs[key] = {sw = sw, kn = kn}
+    local function setVisual(on)
+        if on then
+            TweenService:Create(sw, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 180, 80)}):Play()
+            TweenService:Create(kn, TweenInfo.new(0.2), {Position = UDim2.new(1, -21, 0.5, -9)}):Play()
+        else
+            TweenService:Create(sw, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 40, 40)}):Play()
+            TweenService:Create(kn, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -9)}):Play()
+        end
+    end
+    toggleRefs[key].setVisual = setVisual
+    setVisual(C[key])
+    btn.MouseButton1Click:Connect(function()
+        local ns = not C[key]
+        local ok, res = pcall(callback, ns)
+        if ok and res ~= false then
+            C[key] = ns; setVisual(ns)
+            print("[Toggle] " .. label .. " -> " .. (ns and "ON" or "OFF"))
+        else
+            C[key] = false; setVisual(false)
+            print("[Toggle] " .. label .. " GAGAL!")
+        end
+    end)
+end
+
+-- ===== GUI =====
+local mainGui
+local function buildGUI()
+    mainGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+    mainGui.ResetOnSpawn = false; mainGui.DisplayOrder = 5
+    local f = Instance.new("Frame", mainGui); f.Size = UDim2.new(0, 260, 0, 300)
+    f.Position = UDim2.new(0.5, -130, 0.5, -150); f.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    f.BorderSizePixel = 0; f.Active = true; f.Draggable = true
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+    local hdr = Instance.new("Frame", f); hdr.Size = UDim2.new(1, 0, 0, 42)
+    hdr.BackgroundColor3 = Color3.fromRGB(0, 180, 100); hdr.BorderSizePixel = 0
+    Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 10)
+    local ti = Instance.new("TextLabel", hdr); ti.Size = UDim2.new(1, 0, 1, 0)
+    ti.BackgroundTransparency = 1; ti.Text = "MM2 ESP - Heckes 15"; ti.TextColor3 = Color3.new(1, 1, 1)
+    ti.TextScaled = true; ti.Font = Enum.Font.GothamBold
+    local sc = Instance.new("ScrollingFrame", f); sc.Size = UDim2.new(1, -10, 1, -80)
+    sc.Position = UDim2.new(0, 5, 0, 48); sc.BackgroundTransparency = 1; sc.BorderSizePixel = 0
+    sc.ScrollBarThickness = 4; sc.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sc.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    local ly = Instance.new("UIListLayout", sc); ly.Padding = UDim.new(0, 5); ly.SortOrder = Enum.SortOrder.LayoutOrder
+    createToggle(sc, 1, "🔪 Murderer ESP", "MurdererESP", function(on) updateESP(); return true end)
+    createToggle(sc, 2, "🔫 Sheriff ESP", "SheriffESP", function(on) updateESP(); return true end)
+    createToggle(sc, 3, "👤 Innocent ESP", "InnocentESP", function(on) updateESP(); return true end)
+    createToggle(sc, 4, "🔔 Role Notifikasi", "Notif", function(on) return true end)
+    local cls = Instance.new("TextButton", f); cls.Size = UDim2.new(0.9, 0, 0, 26)
+    cls.Position = UDim2.new(0.05, 0, 1, -32); cls.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    cls.BorderSizePixel = 0; cls.Text = "▼ Sembunyikan GUI"; cls.TextColor3 = Color3.fromRGB(200, 200, 200)
+    cls.TextScaled = true; cls.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", cls).CornerRadius = UDim.new(0, 6)
+    cls.MouseButton1Click:Connect(function() mainGui.Enabled = false end)
+end
+
+-- ===== IKON =====
+local function buildIcon()
+    local ig = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+    ig.ResetOnSpawn = false; ig.DisplayOrder = 10
+    local b = Instance.new("TextButton", ig); b.Size = UDim2.new(0, 52, 0, 52)
+    b.Position = UDim2.new(0, 15, 0.5, -26); b.BackgroundColor3 = Color3.fromRGB(0, 200, 120)
+    b.BorderSizePixel = 0; b.Text = "H15"; b.TextColor3 = Color3.new(1, 1, 1)
+    b.TextScaled = true; b.Font = Enum.Font.GothamBlack; b.AutoButtonColor = false; b.Active = true
+    Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
+    local st = Instance.new("UIStroke", b); st.Color = Color3.new(1, 1, 1); st.Thickness = 2; st.Transparency = 0.3
+    local dragging, dragStart, startPos, moved = false, nil, nil, false
+    b.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; moved = false; dragStart = i.Position; startPos = b.Position end end)
+    UIS.InputChanged:Connect(function(i) if not dragging then return end
+        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+            local d = i.Position - dragStart
+            if math.abs(d.X) > 8 or math.abs(d.Y) > 8 then moved = true end
+            if moved then b.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y) end
+        end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        if dragging and not moved and mainGui then mainGui.Enabled = not mainGui.Enabled end
+        dragging = false; moved = false end end)
+end
+
+-- ===== JALANKAN =====
+intro(function()
+    setupNotif()
+    buildGUI()
+    buildIcon()
+    updateESP()
+    RunService.Heartbeat:Connect(function() if C.MurdererESP or C.SheriffESP or C.InnocentESP then updateESP() end end)
+    print("[Heckes 15] MM2 Role ESP loaded!")
+end)
