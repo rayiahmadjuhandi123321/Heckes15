@@ -1,0 +1,308 @@
+-- ESP NPC UNIVERSAL - HECKES 15 (SINGKAT)
+local P=game:GetService("Players")
+local RS=game:GetService("RunService")
+local TS=game:GetService("TweenService")
+local UIS=game:GetService("UserInputService")
+local LP=P.LocalPlayer
+local C={ESP=false,ShowName=true,ShowDist=true,ShowBox=true,ShowHealth=true}
+local espFolder,activeESPs={},{} -- [model] = billboard
+
+local function intro(cb)
+    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
+    local bg=Instance.new("Frame",g); bg.Size=UDim2.new(1,0,1,0); bg.BackgroundColor3=Color3.new(0,0,0); bg.BorderSizePixel=0
+    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120); t.Position=UDim2.new(0,0,0.5,-60)
+    t.BackgroundTransparency=1; t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150)
+    t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
+    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30); s.Position=UDim2.new(0,0,0.5,80)
+    s.BackgroundTransparency=1; s.Text="ESP NPC EDITION"; s.TextColor3=Color3.fromRGB(200,200,200)
+    s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
+    TS:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play()
+    task.wait(0.3); TS:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
+    task.wait(0.7); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play()
+    task.wait(0.15); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
+    task.wait(1.2)
+    TS:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
+    TS:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    TS:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    task.wait(0.6); g:Destroy(); cb()
+end
+
+local function ch() return LP.Character end
+local function myHRP() local c=ch(); return c and c:FindFirstChild("HumanoidRootPart") end
+
+local function isNPC(m)
+    if not m or not m:IsA("Model") then return false end
+    if not m:FindFirstChildOfClass("Humanoid") then return false end
+    if P:GetPlayerFromCharacter(m) then return false end
+    return true
+end
+
+local function getNPCHRP(m)
+    return m:FindFirstChild("HumanoidRootPart") or m:FindFirstChild("UpperTorso") or m:FindFirstChild("Torso") or m:FindFirstChild("Head")
+end
+
+-- Bikin ESP untuk 1 NPC
+local function makeESP(npc)
+    local hum=npc:FindFirstChildOfClass("Humanoid")
+    local hrp=getNPCHRP(npc)
+    if not hum or not hrp then return end
+    
+    -- Hapus ESP lama kalau ada
+    local old=npc:FindFirstChild("HeckesESP")
+    if old then old:Destroy() end
+    
+    local bb=Instance.new("BillboardGui",npc)
+    bb.Name="HeckesESP"
+    bb.Size=UDim2.new(0,100,0,80)
+    bb.StudsOffset=Vector3.new(0,3,0)
+    bb.AlwaysOnTop=true
+    bb.Adornee=hrp
+    activeESPs[npc]=bb
+    
+    -- Box outline
+    if C.ShowBox then
+        local box=Instance.new("Frame",bb)
+        box.Name="Box"
+        box.Size=UDim2.new(1,0,1,0)
+        box.BackgroundTransparency=1
+        box.BorderSizePixel=0
+        local stroke=Instance.new("UIStroke",box)
+        stroke.Color=Color3.fromRGB(255,50,50)
+        stroke.Thickness=2
+        stroke.Transparency=0.2
+    end
+    
+    -- Nama
+    if C.ShowName then
+        local nm=Instance.new("TextLabel",bb)
+        nm.Name="Name"
+        nm.Size=UDim2.new(1,0,0,20)
+        nm.Position=UDim2.new(0,0,0,-22)
+        nm.BackgroundTransparency=1
+        nm.Text=npc.Name
+        nm.TextColor3=Color3.fromRGB(255,255,255)
+        nm.TextScaled=true
+        nm.Font=Enum.Font.GothamBold
+        nm.TextStrokeTransparency=0
+    end
+    
+    -- Health
+    if C.ShowHealth then
+        local hb=Instance.new("Frame",bb)
+        hb.Name="HealthBG"
+        hb.Size=UDim2.new(0.8,0,0,5)
+        hb.Position=UDim2.new(0.1,0,1,2)
+        hb.BackgroundColor3=Color3.fromRGB(50,50,50)
+        hb.BorderSizePixel=0
+        local hf=Instance.new("Frame",hb)
+        hf.Name="HealthFill"
+        hf.Size=UDim2.new(1,0,1,0)
+        hf.BackgroundColor3=Color3.fromRGB(0,255,0)
+        hf.BorderSizePixel=0
+    end
+    
+    -- Distance
+    if C.ShowDist then
+        local ds=Instance.new("TextLabel",bb)
+        ds.Name="Dist"
+        ds.Size=UDim2.new(1,0,0,16)
+        ds.Position=UDim2.new(0,0,1,8)
+        ds.BackgroundTransparency=1
+        ds.Text="0"
+        ds.TextColor3=Color3.fromRGB(255,255,0)
+        ds.TextScaled=true
+        ds.Font=Enum.Font.GothamBold
+        ds.TextStrokeTransparency=0
+    end
+end
+
+-- Update ESP (loop)
+local espConn
+local function startESP()
+    if espConn then espConn:Disconnect() end
+    espConn=RS.Heartbeat:Connect(function()
+        if not C.ESP then return end
+        local mh=myHRP()
+        
+        -- Scan NPC
+        for _,o in ipairs(workspace:GetDescendants()) do
+            if isNPC(o) and not activeESPs[o] then
+                makeESP(o)
+            end
+        end
+        
+        -- Update ESP yang ada
+        for npc,bb in pairs(activeESPs) do
+            if not npc.Parent or not bb.Parent then
+                if bb.Parent then bb:Destroy() end
+                activeESPs[npc]=nil
+            else
+                local hum=npc:FindFirstChildOfClass("Humanoid")
+                local hrp=getNPCHRP(npc)
+                if hum and hrp then
+                    -- Update distance
+                    if C.ShowDist and mh then
+                        local d=bb:FindFirstChild("Dist")
+                        if d then d.Text=math.floor((hrp.Position-mh.Position).Magnitude).."m" end
+                    end
+                    -- Update health bar
+                    if C.ShowHealth then
+                        local hb=bb:FindFirstChild("HealthBG")
+                        if hb then
+                            local hf=hb:FindFirstChild("HealthFill")
+                            if hf then
+                                local pct=math.clamp(hum.Health/hum.MaxHealth,0,1)
+                                hf.Size=UDim2.new(pct,0,1,0)
+                                hf.BackgroundColor3=pct>0.5 and Color3.fromRGB(0,255,0) or (pct>0.2 and Color3.fromRGB(255,200,0) or Color3.fromRGB(255,0,0))
+                            end
+                        end
+                    end
+                    -- Update warna box by distance
+                    local box=bb:FindFirstChild("Box")
+                    if box and mh then
+                        local st=box:FindFirstChildOfClass("UIStroke")
+                        if st then
+                            local dist=(hrp.Position-mh.Position).Magnitude
+                            st.Color=dist<50 and Color3.fromRGB(255,0,0) or (dist<200 and Color3.fromRGB(255,150,0) or Color3.fromRGB(255,255,0))
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function clearESP()
+    for npc,bb in pairs(activeESPs) do
+        if bb and bb.Parent then bb:Destroy() end
+    end
+    activeESPs={}
+end
+
+local function stopESP()
+    if espConn then espConn:Disconnect(); espConn=nil end
+    clearESP()
+end
+
+-- GUI
+local mainGui,statusL,countL
+local function mkT(parent,ord,label,get,cb)
+    local r=Instance.new("Frame",parent); r.Size=UDim2.new(1,0,0,44)
+    r.BackgroundColor3=Color3.fromRGB(35,35,50); r.BorderSizePixel=0; r.LayoutOrder=ord
+    Instance.new("UICorner",r).CornerRadius=UDim.new(0,6)
+    local lb=Instance.new("TextLabel",r); lb.Size=UDim2.new(0.65,0,1,0); lb.Position=UDim2.new(0,10,0,0)
+    lb.BackgroundTransparency=1; lb.Text=label; lb.TextColor3=Color3.fromRGB(230,230,230)
+    lb.TextScaled=true; lb.Font=Enum.Font.GothamBold; lb.TextXAlignment=Enum.TextXAlignment.Left
+    local sw=Instance.new("Frame",r); sw.Size=UDim2.new(0,50,0,26); sw.Position=UDim2.new(1,-60,0.5,-13)
+    sw.BackgroundColor3=Color3.fromRGB(80,40,40); sw.BorderSizePixel=0
+    Instance.new("UICorner",sw).CornerRadius=UDim.new(1,0)
+    local kn=Instance.new("Frame",sw); kn.Size=UDim2.new(0,20,0,20); kn.Position=UDim2.new(0,3,0.5,-10)
+    kn.BackgroundColor3=Color3.new(1,1,1); kn.BorderSizePixel=0
+    Instance.new("UICorner",kn).CornerRadius=UDim.new(1,0)
+    local btn=Instance.new("TextButton",r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=5
+    local function sv(on)
+        TS:Create(sw,TweenInfo.new(0.2),{BackgroundColor3=on and Color3.fromRGB(50,180,80) or Color3.fromRGB(80,40,40)}):Play()
+        TS:Create(kn,TweenInfo.new(0.2),{Position=on and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)}):Play()
+    end
+    sv(get())
+    btn.MouseButton1Click:Connect(function()
+        local ns=not get()
+        local ok,res=pcall(cb,ns)
+        if ok and res~=false then sv(ns); print("[T] "..label.." "..(ns and "ON" or "OFF"))
+        else sv(false); print("[T] "..label.." GAGAL") end
+    end)
+end
+
+local function build()
+    mainGui=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    mainGui.ResetOnSpawn=false; mainGui.DisplayOrder=5
+    local f=Instance.new("Frame",mainGui); f.Size=UDim2.new(0,300,0,320)
+    f.Position=UDim2.new(0.5,-150,0.5,-160); f.BackgroundColor3=Color3.fromRGB(20,20,30)
+    f.BorderSizePixel=0; f.Active=true; f.Draggable=true
+    Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+    local hd=Instance.new("Frame",f); hd.Size=UDim2.new(1,0,0,42)
+    hd.BackgroundColor3=Color3.fromRGB(0,180,100); hd.BorderSizePixel=0
+    Instance.new("UICorner",hd).CornerRadius=UDim.new(0,10)
+    local ti=Instance.new("TextLabel",hd); ti.Size=UDim2.new(1,0,1,0); ti.BackgroundTransparency=1
+    ti.Text="👁️ ESP NPC - H15"; ti.TextColor3=Color3.new(1,1,1)
+    ti.TextScaled=true; ti.Font=Enum.Font.GothamBold
+    local ct=Instance.new("Frame",f); ct.Size=UDim2.new(1,-20,1,-85); ct.Position=UDim2.new(0,10,0,52)
+    ct.BackgroundTransparency=1
+    local ly=Instance.new("UIListLayout",ct); ly.Padding=UDim.new(0,7); ly.SortOrder=Enum.SortOrder.LayoutOrder
+
+    mkT(ct,1,"👁️ ESP ON/OFF",function() return C.ESP end,function(on)
+        if on then local mh=myHRP(); if not mh then return false end; C.ESP=true; startESP(); return true
+        else C.ESP=false; stopESP(); return true end
+    end)
+    mkT(ct,2,"📛 Nama NPC",function() return C.ShowName end,function(on)
+        C.ShowName=on; if C.ESP then clearESP(); startESP() end; return true end)
+    mkT(ct,3,"📏 Jarak",function() return C.ShowDist end,function(on)
+        C.ShowDist=on; if C.ESP then clearESP(); startESP() end; return true end)
+    mkT(ct,4,"⬜ Kotak",function() return C.ShowBox end,function(on)
+        C.ShowBox=on; if C.ESP then clearESP(); startESP() end; return true end)
+    mkT(ct,5,"❤️ Health Bar",function() return C.ShowHealth end,function(on)
+        C.ShowHealth=on; if C.ESP then clearESP(); startESP() end; return true end)
+
+    statusL=Instance.new("TextLabel",ct); statusL.Size=UDim2.new(1,0,0,24)
+    statusL.BackgroundColor3=Color3.fromRGB(35,35,50); statusL.BorderSizePixel=0
+    statusL.LayoutOrder=6; statusL.Text="🔴 OFF"
+    statusL.TextColor3=Color3.fromRGB(255,100,100); statusL.TextScaled=true; statusL.Font=Enum.Font.GothamBold
+    Instance.new("UICorner",statusL).CornerRadius=UDim.new(0,6)
+
+    countL=Instance.new("TextLabel",ct); countL.Size=UDim2.new(1,0,0,22)
+    countL.BackgroundTransparency=1; countL.LayoutOrder=7
+    countL.Text="NPC: 0"; countL.TextColor3=Color3.fromRGB(200,200,200)
+    countL.TextScaled=true; countL.Font=Enum.Font.Gotham
+
+    local cl=Instance.new("TextButton",f); cl.Size=UDim2.new(0.9,0,0,28)
+    cl.Position=UDim2.new(0.05,0,1,-36); cl.BackgroundColor3=Color3.fromRGB(50,50,70)
+    cl.BorderSizePixel=0; cl.Text="▼ Hide"; cl.TextColor3=Color3.fromRGB(200,200,200)
+    cl.TextScaled=true; cl.Font=Enum.Font.GothamBold
+    Instance.new("UICorner",cl).CornerRadius=UDim.new(0,6)
+    cl.MouseButton1Click:Connect(function() mainGui.Enabled=false end)
+end
+
+local function buildIcon()
+    local ig=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    ig.ResetOnSpawn=false; ig.DisplayOrder=10
+    local b=Instance.new("TextButton",ig); b.Size=UDim2.new(0,52,0,52)
+    b.Position=UDim2.new(0,15,0.5,-26); b.BackgroundColor3=Color3.fromRGB(0,200,120)
+    b.BorderSizePixel=0; b.Text="👁"; b.TextColor3=Color3.new(1,1,1)
+    b.TextScaled=true; b.Font=Enum.Font.GothamBlack; b.AutoButtonColor=false; b.Active=true
+    Instance.new("UICorner",b).CornerRadius=UDim.new(1,0)
+    local st=Instance.new("UIStroke",b); st.Color=Color3.new(1,1,1); st.Thickness=2; st.Transparency=0.3
+    local dg,ds,sp,mv=false,nil,nil,false
+    b.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        dg=true; mv=false; ds=i.Position; sp=b.Position end end)
+    UIS.InputChanged:Connect(function(i) if not dg then return end
+        if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+            local d=i.Position-ds
+            if math.abs(d.X)>8 or math.abs(d.Y)>8 then mv=true end
+            if mv then b.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end
+        end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        if dg and not mv and mainGui then mainGui.Enabled=not mainGui.Enabled end
+        dg=false; mv=false end end)
+end
+
+task.spawn(function() while task.wait(0.5) do
+    if statusL then
+        if C.ESP then
+            statusL.Text="🟢 ESP ON"
+            statusL.TextColor3=Color3.fromRGB(0,255,150)
+        else
+            statusL.Text="🔴 OFF"
+            statusL.TextColor3=Color3.fromRGB(255,100,100)
+        end
+    end
+    if countL then
+        local n=0
+        for _ in pairs(activeESPs) do n=n+1 end
+        countL.Text="NPC ter-ESP: "..n
+    end
+end end)
+
+LP.CharacterAdded:Connect(function() task.wait(1.5); if C.ESP then clearESP(); startESP() end end)
+
+intro(function() build(); buildIcon(); print("[H15] ESP NPC loaded!") end)
