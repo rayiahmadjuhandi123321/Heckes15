@@ -1,0 +1,412 @@
+-- ULTIMATE MULTI TAB - HECKES 15 (SINGKAT)
+local P=game:GetService("Players")
+local RS=game:GetService("RunService")
+local TS=game:GetService("TweenService")
+local UIS=game:GetService("UserInputService")
+local VU=game:GetService("VirtualUser")
+local LP=P.LocalPlayer
+local C={}
+local conns={}
+
+local function intro(cb)
+    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
+    local bg=Instance.new("Frame",g); bg.Size=UDim2.new(1,0,1,0)
+    bg.BackgroundColor3=Color3.new(0,0,0); bg.BorderSizePixel=0
+    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120)
+    t.Position=UDim2.new(0,0,0.5,-60); t.BackgroundTransparency=1
+    t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150)
+    t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
+    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30)
+    s.Position=UDim2.new(0,0,0.5,80); s.BackgroundTransparency=1
+    s.Text="ULTIMATE HUB"; s.TextColor3=Color3.fromRGB(200,200,200)
+    s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
+    TS:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play()
+    task.wait(0.3); TS:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
+    task.wait(0.7); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play()
+    task.wait(0.15); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
+    task.wait(1.2)
+    TS:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
+    TS:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    TS:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    task.wait(0.6); g:Destroy(); cb()
+end
+
+local function ch() return LP.Character end
+local function hum() local c=ch(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function hrp(m) m=m or ch(); return m and (m:FindFirstChild("HumanoidRootPart") or m:FindFirstChild("UpperTorso") or m:FindFirstChild("Torso")) end
+
+-- ESP HELPER
+local function clrESP(n)
+    for _,p in ipairs(P:GetPlayers()) do
+        if p~=LP and p.Character then local e=p.Character:FindFirstChild(n); if e then e:Destroy() end end
+    end
+end
+local function mkESP(c,n,txt,col)
+    local h=hrp(c); if not h then return end
+    local bb=c:FindFirstChild(n)
+    if not bb then
+        bb=Instance.new("BillboardGui",c); bb.Name=n
+        bb.Size=UDim2.new(0,70,0,70); bb.AlwaysOnTop=true
+        local f=Instance.new("Frame",bb); f.Name="F"; f.Size=UDim2.new(1,0,1,0); f.BackgroundTransparency=1
+        local s=Instance.new("UIStroke",f); s.Name="S"; s.Thickness=2
+        local m=Instance.new("TextLabel",bb); m.Name="M"
+        m.Size=UDim2.new(1,0,0,16); m.Position=UDim2.new(0,0,1,2)
+        m.BackgroundTransparency=1; m.TextScaled=true; m.Font=Enum.Font.GothamBold; m.TextStrokeTransparency=0
+    end
+    bb.Adornee=h; bb.M.Text=txt; bb.M.TextColor3=col; bb.F.S.Color=col
+end
+
+-- LOOP HELPER
+local function loop(name,fn)
+    if conns[name] then conns[name]:Disconnect() end
+    conns[name]=RS.Heartbeat:Connect(fn)
+end
+local function stopLoop(name) if conns[name] then conns[name]:Disconnect(); conns[name]=nil end end
+
+-- MOVEMENT
+local function flyFn()
+    loop("fly",function()
+        if not C.Fly then return end
+        local m=hrp(); if not m then return end
+        local bv=m:FindFirstChild("H15F") or Instance.new("BodyVelocity",m)
+        bv.Name="H15F"; bv.MaxForce=Vector3.new(math.huge,math.huge,math.huge)
+        local cam=workspace.CurrentCamera; local d=Vector3.new()
+        if UIS:IsKeyDown(Enum.KeyCode.W) then d=d+cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then d=d-cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then d=d+Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then d=d-Vector3.new(0,1,0) end
+        bv.Velocity=d*60
+    end)
+end
+local function flyOff()
+    stopLoop("fly")
+    local m=hrp(); if m then local b=m:FindFirstChild("H15F"); if b then b:Destroy() end end
+end
+local function noclipFn()
+    if conns.nc then conns.nc:Disconnect() end
+    conns.nc=RS.Stepped:Connect(function()
+        if not C.Noclip then return end
+        local c=ch(); if not c then return end
+        for _,v in ipairs(c:GetDescendants()) do if v:IsA("BasePart") and v.CanCollide then v.CanCollide=false end end
+    end)
+end
+local function noclipOff()
+    if conns.nc then conns.nc:Disconnect(); conns.nc=nil end
+    local c=ch(); if c then for _,v in ipairs(c:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=true end end end
+end
+local function ijFn()
+    if conns.ij then conns.ij:Disconnect() end
+    conns.ij=UIS.JumpRequest:Connect(function()
+        if not C.InfJump then return end
+        local h=hum(); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end)
+end
+local function ijOff() if conns.ij then conns.ij:Disconnect(); conns.ij=nil end end
+local function awFn()
+    loop("aw",function()
+        if not C.AirWalk then return end
+        local m=hrp(); if not m then return end
+        if m.Velocity.Y<-3 then m.Velocity=Vector3.new(m.Velocity.X,0,m.Velocity.Z) end
+    end)
+end
+
+-- VISUAL
+local function pespFn()
+    loop("pe",function()
+        if not C.PlayerESP then return end
+        local m=hrp()
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local txt=p.Name
+                if m then local t=hrp(p.Character); if t then txt=txt.." ["..math.floor((t.Position-m.Position).Magnitude).."m]" end end
+                mkESP(p.Character,"H15E",txt,Color3.fromRGB(255,50,50))
+            end
+        end
+    end)
+end
+local function pespOff() stopLoop("pe"); clrESP("H15E") end
+local function chamsFn()
+    loop("ch",function()
+        if not C.Chams then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character and not p.Character:FindFirstChild("H15C") then
+                local h=Instance.new("Highlight",p.Character); h.Name="H15C"
+                h.FillColor=Color3.fromRGB(255,0,255); h.FillTransparency=0.5
+                h.OutlineColor=Color3.fromRGB(255,255,0); h.OutlineTransparency=0
+                h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+            end
+        end
+    end)
+end
+local function chamsOff()
+    stopLoop("ch")
+    for _,p in ipairs(P:GetPlayers()) do
+        if p~=LP and p.Character then local e=p.Character:FindFirstChild("H15C"); if e then e:Destroy() end end
+    end
+end
+local function skelFn()
+    loop("sk",function()
+        if not C.Skeleton then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                for _,pt in ipairs({"Head","UpperTorso","LowerTorso","LeftHand","RightHand","LeftFoot","RightFoot"}) do
+                    local pp=p.Character:FindFirstChild(pt)
+                    if pp and not pp:FindFirstChild("H15S") then
+                        local bb=Instance.new("BillboardGui",pp); bb.Name="H15S"
+                        bb.Size=UDim2.new(0,10,0,10); bb.AlwaysOnTop=true; bb.Adornee=pp
+                        local f=Instance.new("Frame",bb); f.Size=UDim2.new(1,0,1,0)
+                        f.BackgroundColor3=Color3.fromRGB(0,255,255); f.BorderSizePixel=0
+                        Instance.new("UICorner",f).CornerRadius=UDim.new(1,0)
+                    end
+                end
+            end
+        end
+    end)
+end
+local function skelOff()
+    stopLoop("sk")
+    for _,p in ipairs(P:GetPlayers()) do
+        if p~=LP and p.Character then for _,o in ipairs(p.Character:GetDescendants()) do if o.Name=="H15S" then o:Destroy() end end end
+    end
+end
+local function iespFn()
+    loop("ie",function()
+        if not C.ItemESP then return end
+        for _,o in ipairs(workspace:GetDescendants()) do
+            if o:IsA("Tool") and not o:FindFirstChild("H15I") then
+                local bb=Instance.new("BillboardGui",o); bb.Name="H15I"
+                bb.Size=UDim2.new(0,50,0,20); bb.AlwaysOnTop=true; bb.Adornee=o
+                local m=Instance.new("TextLabel",bb); m.Size=UDim2.new(1,0,1,0)
+                m.BackgroundTransparency=1; m.Text="📦 "..o.Name
+                m.TextColor3=Color3.fromRGB(255,200,0); m.TextScaled=true
+                m.Font=Enum.Font.GothamBold; m.TextStrokeTransparency=0
+            end
+        end
+    end)
+end
+local function iespOff()
+    stopLoop("ie")
+    for _,o in ipairs(workspace:GetDescendants()) do local e=o:FindFirstChild("H15I"); if e then e:Destroy() end end
+end
+
+-- COMBAT
+local function hbFn()
+    loop("hb",function()
+        if not C.Hitbox then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                for _,v in ipairs(p.Character:GetDescendants()) do
+                    if v:IsA("BasePart") and (v.Name=="Head" or v.Name=="HumanoidRootPart" or v.Name=="Torso" or v.Name=="UpperTorso") then
+                        pcall(function() v.Size=Vector3.new(8,8,8); v.Transparency=0.5; v.CanCollide=false end)
+                    end
+                end
+            end
+        end
+    end)
+end
+local function faFn()
+    loop("fa",function()
+        if not C.FastAttack then return end
+        local c=ch(); if not c then return end
+        local t=c:FindFirstChildWhichIsA("Tool")
+        if t then pcall(function() t:Activate() end) end
+    end)
+end
+
+-- AUTO FARM
+local function apFn()
+    loop("ap",function()
+        if not C.AutoPrompt then return end
+        local m=hrp(); if not m then return end
+        for _,o in ipairs(workspace:GetDescendants()) do
+            if o:IsA("ProximityPrompt") then
+                local par=o.Parent
+                if par and par:IsA("BasePart") and (par.Position-m.Position).Magnitude<30 then
+                    pcall(function() fireproximityprompt(o) end)
+                end
+            end
+        end
+    end)
+end
+local function acFn()
+    loop("ac",function()
+        if not C.AutoClick then return end
+        pcall(function() VU:CaptureController(); VU:ClickButton1(Vector2.new(0,0)) end)
+    end)
+end
+local function colFn()
+    loop("col",function()
+        if not C.AutoCollect then return end
+        local m=hrp(); if not m then return end
+        for _,o in ipairs(workspace:GetDescendants()) do
+            if o:IsA("BasePart") and (o.Name:lower():find("coin") or o.Name:lower():find("cash") or o.Name:lower():find("gem")) then
+                if (o.Position-m.Position).Magnitude<50 then pcall(function() m.CFrame=CFrame.new(o.Position+Vector3.new(0,2,0)) end) end
+            end
+        end
+    end)
+end
+
+-- TROLL
+local function sbFn()
+    loop("sb",function()
+        if not C.SpinBot then return end
+        local m=hrp(); if not m then return end
+        m.CFrame=m.CFrame*CFrame.Angles(0,math.rad(45),0)
+    end)
+end
+local function flingOne(p)
+    if not p or not p.Character then return end
+    local t=hrp(p.Character); if not t then return end
+    pcall(function()
+        local bv=Instance.new("BodyVelocity",t)
+        bv.MaxForce=Vector3.new(math.huge,math.huge,math.huge)
+        bv.Velocity=Vector3.new(math.random(-500,500),math.random(300,600),math.random(-500,500))
+        local bg=Instance.new("BodyAngularVelocity",t)
+        bg.MaxTorque=Vector3.new(math.huge,math.huge,math.huge)
+        bg.AngularVelocity=Vector3.new(math.random(-50,50),math.random(-50,50),math.random(-50,50))
+        game:GetService("Debris"):AddItem(bv,0.4); game:GetService("Debris"):AddItem(bg,0.4)
+    end)
+end
+local function tfFn()
+    loop("tf",function()
+        if not C.TouchFling then return end
+        local m=hrp(); if not m then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local t=hrp(p.Character)
+                if t and (m.Position-t.Position).Magnitude<6 then flingOne(p) end
+            end
+        end
+    end)
+end
+local function invisFn(on)
+    local c=ch(); if not c then return false end
+    for _,v in ipairs(c:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name~="HumanoidRootPart" then v.Transparency=on and 1 or 0 end
+        if v:IsA("Decal") or v:IsA("Texture") then v.Transparency=on and 1 or 0 end
+    end
+    return true
+end
+
+-- SERVER
+local function afkFn()
+    loop("afk",function()
+        if not C.AntiAFK then return end
+        pcall(function() VU:CaptureController(); VU:ClickButton2(Vector2.new()) end)
+    end)
+end
+local function giveBtools()
+    local bp=LP:FindFirstChild("Backpack"); if not bp then return false end
+    for _,n in ipairs({"Grab","Clone","Hammer"}) do
+        pcall(function() local t=Instance.new("HopperBin",bp); t.BinType=Enum.BinType[n] end)
+    end
+    return true
+end
+local function load2(url,name)
+    local ok=pcall(function() loadstring(game:HttpGet(url))() end)
+    if ok then Rayfield:Notify({Title="✅",Content=name.." loaded!",Duration=4})
+    else Rayfield:Notify({Title="❌",Content=name.." gagal",Duration=5}) end
+end
+
+-- START
+intro(function()
+    local ok,Rayfield=pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield'))() end)
+    if not ok or not Rayfield then warn("[H15] Rayfield gagal!"); return end
+    local W=Rayfield:CreateWindow({
+        Name="Heckes 15 Hub", LoadingTitle="Ultimate Hub...", LoadingSubtitle="by Heckes",
+        Theme="Default", ToggleUIKeybind="K", ConfigurationSaving={Enabled=false},
+        Discord={Enabled=false}, KeySystem=false
+    })
+
+    -- TAB 1
+    local T1=W:CreateTab("Movement",4483362458)
+    T1:CreateSlider({Name="WalkSpeed",Range={16,300},Increment=1,Suffix="Spd",CurrentValue=16,Flag="WS",
+        Callback=function(v) local h=hum(); if h then h.WalkSpeed=v end end})
+    T1:CreateSlider({Name="JumpPower",Range={50,500},Increment=5,Suffix="Jmp",CurrentValue=50,Flag="JP",
+        Callback=function(v) local h=hum(); if h then h.JumpPower=v end end})
+    T1:CreateSlider({Name="Gravity",Range={0,300},Increment=5,Suffix="G",CurrentValue=196,Flag="GR",
+        Callback=function(v) workspace.Gravity=v end})
+    T1:CreateToggle({Name="Fly",CurrentValue=false,Flag="Fly",Callback=function(v) C.Fly=v; if v then flyFn() else flyOff() end end})
+    T1:CreateToggle({Name="Noclip",CurrentValue=false,Flag="NC",Callback=function(v) C.Noclip=v; if v then noclipFn() else noclipOff() end end})
+    T1:CreateToggle({Name="Infinite Jump",CurrentValue=false,Flag="IJ",Callback=function(v) C.InfJump=v; if v then ijFn() else ijOff() end end})
+    T1:CreateToggle({Name="Air Walk",CurrentValue=false,Flag="AW",Callback=function(v) C.AirWalk=v; if v then awFn() else stopLoop("aw") end end})
+
+    -- TAB 2
+    local T2=W:CreateTab("Visual",4483362458)
+    T2:CreateToggle({Name="Player ESP",CurrentValue=false,Flag="PE",Callback=function(v) C.PlayerESP=v; if v then pespFn() else pespOff() end end})
+    T2:CreateToggle({Name="Chams",CurrentValue=false,Flag="CH",Callback=function(v) C.Chams=v; if v then chamsFn() else chamsOff() end end})
+    T2:CreateToggle({Name="Skeleton ESP",CurrentValue=false,Flag="SK",Callback=function(v) C.Skeleton=v; if v then skelFn() else skelOff() end end})
+    T2:CreateToggle({Name="Item ESP",CurrentValue=false,Flag="IE",Callback=function(v) C.ItemESP=v; if v then iespFn() else iespOff() end end})
+
+    -- TAB 3
+    local T3=W:CreateTab("Combat",4483362458)
+    T3:CreateSlider({Name="FOV Radius",Range={50,500},Increment=10,Suffix="FOV",CurrentValue=200,Flag="FOV",
+        Callback=function(v) C.FOV=v end})
+    T3:CreateToggle({Name="Hitbox Expander",CurrentValue=false,Flag="HB",Callback=function(v) C.Hitbox=v; if v then hbFn() else stopLoop("hb") end end})
+    T3:CreateToggle({Name="Fast Attack",CurrentValue=false,Flag="FA",Callback=function(v) C.FastAttack=v; if v then faFn() else stopLoop("fa") end end})
+
+    -- TAB 4
+    local T4=W:CreateTab("Auto Farm",4483362458)
+    T4:CreateToggle({Name="Auto ProximityPrompt",CurrentValue=false,Flag="AP",Callback=function(v) C.AutoPrompt=v; if v then apFn() else stopLoop("ap") end end})
+    T4:CreateToggle({Name="Auto Clicker",CurrentValue=false,Flag="AC",Callback=function(v) C.AutoClick=v; if v then acFn() else stopLoop("ac") end end})
+    T4:CreateToggle({Name="Auto Collect Coins",CurrentValue=false,Flag="COL",Callback=function(v) C.AutoCollect=v; if v then colFn() else stopLoop("col") end end})
+
+    -- TAB 5
+    local T5=W:CreateTab("Troll",4483362458)
+    T5:CreateToggle({Name="Spin Bot",CurrentValue=false,Flag="SB",Callback=function(v) C.SpinBot=v; if v then sbFn() else stopLoop("sb") end end})
+    T5:CreateToggle({Name="Touch Fling",CurrentValue=false,Flag="TF",Callback=function(v) C.TouchFling=v; if v then tfFn() else stopLoop("tf") end end})
+    T5:CreateButton({Name="🔥 Fling All",Callback=function()
+        for _,p in ipairs(P:GetPlayers()) do if p~=LP then flingOne(p) end end
+        Rayfield:Notify({Title="Fling",Content="Fling all!",Duration=3})
+    end})
+    T5:CreateToggle({Name="Invisible",CurrentValue=false,Flag="IV",Callback=function(v) invisFn(v) end})
+
+    -- TAB 6
+    local T6=W:CreateTab("Server",4483362458)
+    T6:CreateToggle({Name="Anti AFK",CurrentValue=false,Flag="AFK",Callback=function(v) C.AntiAFK=v; if v then afkFn() else stopLoop("afk") end end})
+    T6:CreateButton({Name="Rejoin",Callback=function() game:GetService("TeleportService"):Teleport(game.PlaceId,LP) end})
+    T6:CreateButton({Name="Server Hop",Callback=function()
+        pcall(function()
+            local r=game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=10")
+            local d=game:GetService("HttpService"):JSONDecode(r)
+            for _,s in ipairs(d.data) do
+                if s.playing<s.maxPlayers and s.id~=game.JobId then
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId,s.id,LP); return
+                end
+            end
+        end)
+    end})
+    T6:CreateButton({Name="🔨 Give Btools",Callback=function()
+        if giveBtools() then Rayfield:Notify({Title="Btools",Content="Dikasih!",Duration=3}) end
+    end})
+    T6:CreateButton({Name="🔍 DEX Explorer",Callback=function()
+        load2("https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua","DEX")
+    end})
+    T6:CreateButton({Name="📡 Remote Spy",Callback=function()
+        load2("https://raw.githubusercontent.com/extremestuffs/SimpleSpySource/master/SimpleSpy.lua","Spy")
+    end})
+
+    Rayfield:Notify({Title="H15",Content="6 Tab loaded!",Duration=5,Image=4483362458})
+    print("[H15] Loaded!")
+end)
+
+LP.CharacterAdded:Connect(function()
+    task.wait(1.5)
+    if C.Noclip then noclipFn() end
+    if C.Fly then flyFn() end
+    if C.InfJump then ijFn() end
+    if C.AirWalk then awFn() end
+    if C.PlayerESP then pespFn() end
+    if C.Chams then chamsFn() end
+    if C.Skeleton then skelFn() end
+    if C.ItemESP then iespFn() end
+    if C.Hitbox then hbFn() end
+    if C.FastAttack then faFn() end
+    if C.AutoPrompt then apFn() end
+    if C.AutoClick then acFn() end
+    if C.AutoCollect then colFn() end
+    if C.SpinBot then sbFn() end
+    if C.TouchFling then tfFn() end
+    if C.AntiAFK then afkFn() end
+end)
