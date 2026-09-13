@@ -1,0 +1,318 @@
+-- MENARA SLAP TROLL KECIL - HECKES 15 (SINGKAT)
+local P=game:GetService("Players")
+local RS=game:GetService("RunService")
+local TS=game:GetService("TweenService")
+local UIS=game:GetService("UserInputService")
+local LP=P.LocalPlayer
+local C={AutoSlap=false,Reach=false,SlapFling=false,AntiKB=false,
+         AutoClimb=false,InfJump=false,Fly=false,Noclip=false,
+         ESP=false,AntiAFK=false}
+local conns={}
+local baseSpeed,baseJump
+
+local function intro(cb)
+    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
+    g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
+    local bg=Instance.new("Frame",g); bg.Size=UDim2.new(1,0,1,0)
+    bg.BackgroundColor3=Color3.new(0,0,0); bg.BorderSizePixel=0
+    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120)
+    t.Position=UDim2.new(0,0,0.5,-60); t.BackgroundTransparency=1
+    t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150)
+    t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
+    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30)
+    s.Position=UDim2.new(0,0,0.5,80); s.BackgroundTransparency=1
+    s.Text="MENARA SLAP TROLL"; s.TextColor3=Color3.fromRGB(200,200,200)
+    s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
+    TS:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play()
+    task.wait(0.3); TS:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
+    task.wait(0.7); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play()
+    task.wait(0.15); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
+    task.wait(1.2)
+    TS:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
+    TS:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    TS:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    task.wait(0.6); g:Destroy(); cb()
+end
+
+local function ch() return LP.Character end
+local function hum() local c=ch(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function hrp() local c=ch(); return c and c:FindFirstChild("HumanoidRootPart") end
+
+-- ===== TOOL ACTIVATE =====
+local function getSlapTool()
+    local c=ch(); if not c then return nil end
+    for _,v in ipairs(c:GetChildren()) do
+        if v:IsA("Tool") then return v end
+    end
+    return nil
+end
+
+local function activateSlap()
+    local tool=getSlapTool()
+    if tool then
+        pcall(function()
+            tool:Activate()
+        end)
+        return true
+    end
+    return false
+end
+
+-- ===== AUTO SLAP AURA =====
+local function startAutoSlap()
+    if conns.slap then conns.slap:Disconnect() end
+    conns.slap=RS.Heartbeat:Connect(function()
+        if not C.AutoSlap then return end
+        local mh=hrp(); if not mh then return end
+        local tool=getSlapTool()
+        if not tool then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local th=p.Character:FindFirstChild("HumanoidRootPart")
+                if th and (mh.Position-th.Position).Magnitude<12 then
+                    pcall(function() tool:Activate() end)
+                end
+            end
+        end
+    end)
+    return true
+end
+local function stopAutoSlap() if conns.slap then conns.slap:Disconnect(); conns.slap=nil end end
+
+-- ===== REACH / HITBOX EXPANDER =====
+local function startReach()
+    if conns.reach then conns.reach:Disconnect() end
+    conns.reach=RS.Heartbeat:Connect(function()
+        if not C.Reach then return end
+        local c=ch(); if not c then return end
+        for _,v in ipairs(c:GetChildren()) do
+            if v:IsA("Tool") then
+                local h=v:FindFirstChild("Handle")
+                if h then
+                    h.Size=Vector3.new(8,8,8)
+                    h.Transparency=0.5
+                    h.CanCollide=false
+                end
+            end
+        end
+    end)
+    return true
+end
+local function stopReach()
+    if conns.reach then conns.reach:Disconnect(); conns.reach=nil end
+    local c=ch(); if c then
+        for _,v in ipairs(c:GetChildren()) do
+            if v:IsA("Tool") then
+                local h=v:FindFirstChild("Handle")
+                if h then
+                    h.Size=Vector3.new(1,1,1)
+                    h.Transparency=0
+                    h.CanCollide=true
+                end
+            end
+        end
+    end
+end
+
+-- ===== SLAP FLING =====
+local function startSlapFling()
+    if conns.fling then conns.fling:Disconnect() end
+    conns.fling=RS.Heartbeat:Connect(function()
+        if not C.SlapFling then return end
+        local mh=hrp(); if not mh then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local th=p.Character:FindFirstChild("HumanoidRootPart")
+                if th and (mh.Position-th.Position).Magnitude<10 then
+                    local bv=Instance.new("BodyVelocity",th)
+                    bv.MaxForce=Vector3.new(math.huge,math.huge,math.huge)
+                    bv.Velocity=Vector3.new(math.random(-200,200),200,math.random(-200,200))
+                    game:GetService("Debris"):AddItem(bv,0.5)
+                end
+            end
+        end
+    end)
+    return true
+end
+local function stopSlapFling() if conns.fling then conns.fling:Disconnect(); conns.fling=nil end end
+
+-- ===== ANTI KNOCKBACK / GODMODE =====
+local function startAntiKB()
+    if conns.antikb then conns.antikb:Disconnect() end
+    conns.antikb=RS.Heartbeat:Connect(function()
+        if not C.AntiKB then return end
+        local c=ch(); if not c then return end
+        local h=hum()
+        if h then pcall(function() h.Health=h.MaxHealth end) end
+        for _,v in ipairs(c:GetDescendants()) do
+            if v:IsA("BodyVelocity") or v:IsA("BodyAngularVelocity") or v:IsA("BodyGyro") then
+                if v.Name~="H15Self" then v:Destroy() end
+            end
+        end
+    end)
+    return true
+end
+local function stopAntiKB() if conns.antikb then conns.antikb:Disconnect(); conns.antikb=nil end end
+
+-- ===== INFINITE JUMP =====
+local function startInfJump()
+    if conns.jump then conns.jump:Disconnect() end
+    conns.jump=UIS.JumpRequest:Connect(function()
+        if not C.InfJump then return end
+        local h=hum(); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end)
+    return true
+end
+local function stopInfJump()
+    if conns.jump then conns.jump:Disconnect(); conns.jump=nil end
+end
+
+-- ===== TELEPORT TO TOP =====
+local function teleportTop()
+    local mh=hrp(); if not mh then return false end
+    -- Cari part paling tinggi di workspace
+    local highest=nil
+    for _,o in ipairs(workspace:GetDescendants()) do
+        if o:IsA("BasePart") and o.Anchored then
+            if not highest or o.Position.Y>highest.Position.Y then
+                highest=o
+            end
+        end
+    end
+    if highest then
+        mh.CFrame=CFrame.new(highest.Position+Vector3.new(0,5,0))
+        return true
+    end
+    return false
+end
+
+-- ===== ESP =====
+local function clearESP()
+    for _,p in ipairs(P:GetPlayers()) do
+        if p~=LP and p.Character then
+            local e=p.Character:FindFirstChild("H15ESP")
+            if e then e:Destroy() end
+        end
+    end
+end
+local function startESP()
+    if conns.esp then conns.esp:Disconnect() end
+    conns.esp=RS.Heartbeat:Connect(function()
+        if not C.ESP then return end
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP and p.Character then
+                local h=p.Character:FindFirstChild("HumanoidRootPart")
+                if h and not p.Character:FindFirstChild("H15ESP") then
+                    local bb=Instance.new("BillboardGui",p.Character)
+                    bb.Name="H15ESP"; bb.Size=UDim2.new(0,50,0,50)
+                    bb.AlwaysOnTop=true; bb.Adornee=h
+                    local fr=Instance.new("Frame",bb); fr.Size=UDim2.new(1,0,1,0)
+                    fr.BackgroundTransparency=1
+                    local st=Instance.new("UIStroke",fr)
+                    st.Color=Color3.fromRGB(255,50,50); st.Thickness=2
+                    local nm=Instance.new("TextLabel",bb); nm.Size=UDim2.new(1,0,0,16)
+                    nm.Position=UDim2.new(0,0,1,2); nm.BackgroundTransparency=1
+                    nm.Text=p.Name; nm.TextColor3=Color3.new(1,1,1)
+                    nm.TextScaled=true; nm.Font=Enum.Font.GothamBold
+                end
+            end
+        end
+    end)
+    return true
+end
+local function stopESP()
+    if conns.esp then conns.esp:Disconnect(); conns.esp=nil end
+    clearESP()
+end
+
+-- ===== ANTI AFK =====
+local function startAntiAFK()
+    if conns.afk then conns.afk:Disconnect() end
+    conns.afk=RS.Heartbeat:Connect(function()
+        if not C.AntiAFK then return end
+        local vu=game:GetService("VirtualUser")
+        vu:CaptureController(); vu:ClickButton2(Vector2.new())
+    end)
+    return true
+end
+local function stopAntiAFK()
+    if conns.afk then conns.afk:Disconnect(); conns.afk=nil end
+end
+
+-- ===== START =====
+intro(function()
+    local ok,Rayfield=pcall(function()
+        return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+    end)
+    if not ok or not Rayfield then
+        warn("[H15] Rayfield gagal load!")
+        return
+    end
+
+    local W=Rayfield:CreateWindow({
+        Name="Heckes 15 Hub",
+        LoadingTitle="Menara Slap Troll...",
+        LoadingSubtitle="by Heckes",
+        Theme="Default",
+        ToggleUIKeybind="K",
+        ConfigurationSaving={Enabled=false},
+        Discord={Enabled=false},
+        KeySystem=false
+    })
+
+    -- TAB 1: COMBAT & TROLL
+    local T1=W:CreateTab("Combat & Troll",4483362458)
+    T1:CreateSection("Serangan Otomatis")
+    T1:CreateToggle({Name="Auto Slap Aura",CurrentValue=false,Flag="AS",
+        Callback=function(v) C.AutoSlap=v; if v then startAutoSlap() else stopAutoSlap() end end})
+    T1:CreateToggle({Name="Reach / Hitbox Expander",CurrentValue=false,Flag="RH",
+        Callback=function(v) C.Reach=v; if v then startReach() else stopReach() end end})
+    T1:CreateToggle({Name="Slap Fling",CurrentValue=false,Flag="SF",
+        Callback=function(v) C.SlapFling=v; if v then startSlapFling() else stopSlapFling() end end})
+    T1:CreateToggle({Name="Anti Knockback / Godmode",CurrentValue=false,Flag="AK",
+        Callback=function(v) C.AntiKB=v; if v then startAntiKB() else stopAntiKB() end end})
+
+    -- TAB 2: TOWER & MOVEMENT
+    local T2=W:CreateTab("Tower & Movement",4483362458)
+    T2:CreateSection("Pergerakan")
+    T2:CreateButton({Name="Teleport to Top",Callback=function()
+        if teleportTop() then
+            Rayfield:Notify({Title="Teleport",Content="Ke puncak menara!",Duration=4})
+        end
+    end})
+    T2:CreateToggle({Name="Infinite Jump",CurrentValue=false,Flag="IJ",
+        Callback=function(v) C.InfJump=v; if v then startInfJump() else stopInfJump() end end})
+    T2:CreateSlider({Name="Walk Speed",Range={16,200},Increment=1,Suffix="Speed",
+        CurrentValue=16,Flag="WS",
+        Callback=function(v) local h=hum(); if h then h.WalkSpeed=v end end})
+    T2:CreateSlider({Name="Jump Power",Range={50,500},Increment=5,Suffix="Jump",
+        CurrentValue=50,Flag="JP",
+        Callback=function(v) local h=hum(); if h then h.JumpPower=v end end})
+
+    -- TAB 3: VISUAL & UTILITY
+    local T3=W:CreateTab("Visual & Utility",4483362458)
+    T3:CreateSection("Informasi")
+    T3:CreateToggle({Name="Player ESP",CurrentValue=false,Flag="ESP",
+        Callback=function(v) C.ESP=v; if v then startESP() else stopESP() end end})
+    T3:CreateToggle({Name="Anti AFK",CurrentValue=false,Flag="AFK",
+        Callback=function(v) C.AntiAFK=v; if v then startAntiAFK() else stopAntiAFK() end end})
+    T3:CreateButton({Name="Rejoin Server",Callback=function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId,LP)
+    end})
+
+    Rayfield:Notify({Title="Heckes 15 Hub",Content="Script loaded!",
+        Duration=6,Image=4483362458})
+    print("[H15] Menara Slap Troll loaded!")
+end)
+
+LP.CharacterAdded:Connect(function()
+    task.wait(1.5)
+    baseSpeed=nil; baseJump=nil
+    if C.AutoSlap then startAutoSlap() end
+    if C.Reach then startReach() end
+    if C.SlapFling then startSlapFling() end
+    if C.AntiKB then startAntiKB() end
+    if C.InfJump then startInfJump() end
+    if C.ESP then startESP() end
+    if C.AntiAFK then startAntiAFK() end
+end)
