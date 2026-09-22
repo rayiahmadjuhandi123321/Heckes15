@@ -1,387 +1,209 @@
--- FOLLOW TRAIL FE - HECKES 15 (ADJUSTABLE DISTANCE)
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
-local LP = Players.LocalPlayer
-local C = {FollowMode=false, AutoRecord=true, ShowTrail=false}
-local target, waypoints, lastRecordPos, followIdx, trailParts = nil, {}, nil, 1, {}
-local RECORD_DIST = 8
-local FOLLOW_SPEED = 18
-local MAX_DIST = 2       -- bisa diubah dari GUI
-local STOPPED = false
+-- MIMIC FOLLOW FE - HECKES 15 (V9 - Display Name + Username)
+local P,RS,TS,UIS=game:GetService("Players"),game:GetService("RunService"),game:GetService("TweenService"),game:GetService("UserInputService")
+local LP=P.LocalPlayer
+local C={Follow=false,Record=true,Trail=false,Jump=true,Fly=true}
+local tgt,wps,lastWP,fIdx,tParts={},{},nil,1,{}
+local MAX,TELD,TELMIN,TELMAX,TELSTEP=2,30,5,200,5
+local lastJT,lastTP,JC,TC,WSPD=0,0,0.5,1.5,18
 
--- ===== INTRO =====
 local function intro(cb)
-    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui"))
-    g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
+    local g=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui")); g.ResetOnSpawn=false; g.IgnoreGuiInset=true; g.DisplayOrder=999
     local bg=Instance.new("Frame",g); bg.Size=UDim2.new(1,0,1,0); bg.BackgroundColor3=Color3.new(0,0,0); bg.BorderSizePixel=0
-    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120); t.Position=UDim2.new(0,0,0.5,-60)
-    t.BackgroundTransparency=1; t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150)
-    t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
-    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30); s.Position=UDim2.new(0,0,0.5,80)
-    s.BackgroundTransparency=1; s.Text="FOLLOW TRAIL EDITION"; s.TextColor3=Color3.fromRGB(200,200,200)
-    s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
-    TweenService:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play()
-    task.wait(0.3); TweenService:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
-    task.wait(0.7); TweenService:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play()
-    task.wait(0.15); TweenService:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
-    task.wait(1.2)
-    TweenService:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play()
-    TweenService:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play()
-    TweenService:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
+    local t=Instance.new("TextLabel",bg); t.Size=UDim2.new(1,0,0,120); t.Position=UDim2.new(0,0,0.5,-60); t.BackgroundTransparency=1; t.Text="HECKES 15"; t.TextColor3=Color3.fromRGB(0,255,150); t.TextScaled=true; t.Font=Enum.Font.GothamBlack; t.TextTransparency=1
+    local s=Instance.new("TextLabel",bg); s.Size=UDim2.new(1,0,0,30); s.Position=UDim2.new(0,0,0.5,80); s.BackgroundTransparency=1; s.Text="MIMIC V9"; s.TextColor3=Color3.fromRGB(200,200,200); s.TextScaled=true; s.Font=Enum.Font.Gotham; s.TextTransparency=1
+    TS:Create(t,TweenInfo.new(0.5),{TextTransparency=0}):Play(); task.wait(0.3); TS:Create(s,TweenInfo.new(0.4),{TextTransparency=0}):Play()
+    task.wait(0.7); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.new(1,1,1)}):Play(); task.wait(0.15); TS:Create(t,TweenInfo.new(0.15),{TextColor3=Color3.fromRGB(0,255,150)}):Play()
+    task.wait(1.2); TS:Create(bg,TweenInfo.new(0.5),{BackgroundTransparency=1}):Play(); TS:Create(t,TweenInfo.new(0.4),{TextTransparency=1}):Play(); TS:Create(s,TweenInfo.new(0.4),{TextTransparency=1}):Play()
     task.wait(0.6); g:Destroy(); cb()
 end
 
--- ===== HELPER =====
-local function char() return LP.Character end
-local function hrp() local c=char(); return c and c:FindFirstChild("HumanoidRootPart") end
-local function hum() local c=char(); return c and c:FindFirstChildOfClass("Humanoid") end
-local function targetHRP() return target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") end
+local function chr() return LP.Character end
+local function hrp() local c=chr(); return c and c:FindFirstChild("HumanoidRootPart") end
+local function hm() local c=chr(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function tHRP() return tgt and tgt.Character and tgt.Character:FindFirstChild("HumanoidRootPart") end
+local function tHM() return tgt and tgt.Character and tgt.Character:FindFirstChildOfClass("Humanoid") end
+local function clearT() for _,p in ipairs(tParts) do if p.Parent then p:Destroy() end end; tParts={} end
+local function addT(pos)
+    if not C.Trail then return end
+    local p=Instance.new("Part",workspace); p.Shape=Enum.PartType.Cylinder; p.Size=Vector3.new(1,0.2,1)
+    p.CFrame=CFrame.new(pos)*CFrame.Angles(0,0,math.rad(90)); p.Anchored=true; p.CanCollide=false
+    p.Color=Color3.fromRGB(0,255,150); p.Material=Enum.Material.Neon; p.Transparency=0.3
+    table.insert(tParts,p)
+    task.delay(8,function() if p.Parent then TS:Create(p,TweenInfo.new(1),{Transparency=1}):Play(); task.wait(1.1); p:Destroy() end end)
+end
+local function recWP(pos)
+    if not lastWP or (pos-lastWP).Magnitude>=6 then
+        table.insert(wps,pos); lastWP=pos; addT(pos)
+        if #wps>300 then table.remove(wps,1) end
+    end
+end
+local function stopM() local h=hrp(); if h then local b=h:FindFirstChild("HBV"); if b then b:Destroy() end end end
+local function resetChar() stopM(); local h=hrp(); if h then h.Velocity=Vector3.new(0,h.Velocity.Y,0); h.RotVelocity=Vector3.new() end end
+local function inAir(h) if not h then return false end local s=h:GetState(); return s==Enum.HumanoidStateType.Jumping or s==Enum.HumanoidStateType.Freefall or s==Enum.HumanoidStateType.Flying end
+local function hasFloor(h,d) local pr=RaycastParams.new(); pr.FilterType=Enum.RaycastFilterType.Exclude; pr.FilterDescendantsInstances={chr()}; return workspace:Raycast(h.Position,Vector3.new(0,-d,0),pr)~=nil end
 
-local function clearTrailVisual()
-    for _, p in ipairs(trailParts) do if p and p.Parent then p:Destroy() end end
-    trailParts = {}
+local function move(h,tp)
+    local d=tp-h.Position; local fd=Vector3.new(d.X,0,d.Z); local dir=fd.Magnitude>0.1 and fd.Unit or Vector3.new()
+    local bv=h:FindFirstChild("HBV") or Instance.new("BodyVelocity",h)
+    bv.Name="HBV"
+    local spd=WSPD; if fd.Magnitude>20 then spd=WSPD+6 elseif fd.Magnitude<5 then spd=WSPD-6 end
+    local hd=tp.Y-h.Position.Y
+    if C.Fly and hd>8 and not hasFloor(h,6) then
+        bv.MaxForce=Vector3.new(math.huge,5000,math.huge); bv.Velocity=Vector3.new(dir.X*spd,math.clamp(hd*2,15,50),dir.Z*spd)
+    else
+        bv.MaxForce=Vector3.new(math.huge,0,math.huge); bv.Velocity=Vector3.new(dir.X*spd,0,dir.Z*spd)
+    end
+    if fd.Magnitude>0.5 then h.CFrame=CFrame.new(h.Position,Vector3.new(tp.X,h.Position.Y,tp.Z)) end
 end
 
-local function addWaypointVisual(pos)
-    if not C.ShowTrail then return end
-    local part = Instance.new("Part", workspace)
-    part.Size = Vector3.new(1, 0.2, 1); part.Shape = Enum.PartType.Cylinder
-    part.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
-    part.Anchored = true; part.CanCollide = false
-    part.Color = Color3.fromRGB(0, 255, 150); part.Material = Enum.Material.Neon
-    part.Transparency = 0.3
-    table.insert(trailParts, part)
-    task.delay(8, function()
-        if part and part.Parent then
-            TweenService:Create(part, TweenInfo.new(1), {Transparency = 1}):Play()
-            task.wait(1.1); part:Destroy()
+local function tryTP(mhrp,th)
+    local now=tick(); if now-lastTP<TC then return false end
+    local dist=(mhrp.Position-th.Position).Magnitude; if dist<TELD then return false end
+    local dest=th.Position+th.CFrame.LookVector*-3+Vector3.new(0,1,0)
+    mhrp.CFrame=CFrame.new(dest,th.Position); mhrp.Velocity=Vector3.new()
+    lastTP=now; print(string.format("[Teleport] %.1fm -> target",dist)); return true
+end
+
+local conn,stopped=false,false
+local function start()
+    if conn then conn:Disconnect() end
+    conn=RS.Heartbeat:Connect(function()
+        local mh,mhrp=hm(),hrp(); if not mh or not mhrp then return end
+        if C.Record and tgt then local th=tHRP(); if th then recWP(th.Position) end end
+        if not C.Follow or not tgt then return end
+        local th,thm=tHRP(),tHM(); if not th or not thm then stopM(); return end
+        local mAir,tAir=inAir(mh),inAir(thm)
+        local ydiff,now=th.Position.Y-mhrp.Position.Y,tick()
+        if (mhrp.Position-th.Position).Magnitude>=TELD and tryTP(mhrp,th) then return end
+        if C.Jump and not mAir and ydiff>2 and now-lastJT>=JC then
+            mhrp.Velocity=Vector3.new(mhrp.Velocity.X,math.clamp(math.sqrt(ydiff*400),45,130),mhrp.Velocity.Z); lastJT=now; mAir=true
         end
+        local dist=(mhrp.Position-th.Position).Magnitude
+        if dist<=MAX and not mAir then if not stopped then stopM(); stopped=true end; return end
+        stopped=false
+        if mAir or tAir then move(mhrp,th.Position); return end
+        if #wps>0 and fIdx<=#wps then
+            local nw=wps[fIdx]
+            if (mhrp.Position-nw).Magnitude<2 or (nw-th.Position).Magnitude>dist+5 then fIdx=fIdx+1
+            else move(mhrp,nw); return end
+        end
+        move(mhrp,th.Position)
     end)
 end
+local function stop() if conn then conn:Disconnect(); conn=nil end stopM(); stopped=false resetChar() end
 
-local function recordWaypoint(pos)
-    if not lastRecordPos or (pos - lastRecordPos).Magnitude >= RECORD_DIST then
-        table.insert(waypoints, pos)
-        lastRecordPos = pos
-        addWaypointVisual(pos)
-        if #waypoints > 200 then table.remove(waypoints, 1) end
+local tRefs={}
+local function mkTog(par,ord,lbl,key,cb)
+    local row=Instance.new("Frame",par); row.Size=UDim2.new(1,-12,0,36); row.BackgroundColor3=Color3.fromRGB(35,35,50); row.BorderSizePixel=0; row.LayoutOrder=ord
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+    local lb=Instance.new("TextLabel",row); lb.Size=UDim2.new(0.65,0,1,0); lb.Position=UDim2.new(0,10,0,0); lb.BackgroundTransparency=1; lb.Text=lbl; lb.TextColor3=Color3.fromRGB(230,230,230); lb.TextScaled=true; lb.Font=Enum.Font.Gotham; lb.TextXAlignment=Enum.TextXAlignment.Left
+    local sw=Instance.new("Frame",row); sw.Size=UDim2.new(0,46,0,24); sw.Position=UDim2.new(1,-56,0.5,-12); sw.BackgroundColor3=Color3.fromRGB(80,40,40); sw.BorderSizePixel=0; Instance.new("UICorner",sw).CornerRadius=UDim.new(1,0)
+    local kn=Instance.new("Frame",sw); kn.Size=UDim2.new(0,18,0,18); kn.Position=UDim2.new(0,3,0.5,-9); kn.BackgroundColor3=Color3.new(1,1,1); kn.BorderSizePixel=0; Instance.new("UICorner",kn).CornerRadius=UDim.new(1,0)
+    local btn=Instance.new("TextButton",row); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=5
+    local function sv(on)
+        if on then TS:Create(sw,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(50,180,80)}):Play(); TS:Create(kn,TweenInfo.new(0.2),{Position=UDim2.new(1,-21,0.5,-9)}):Play()
+        else TS:Create(sw,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(80,40,40)}):Play(); TS:Create(kn,TweenInfo.new(0.2),{Position=UDim2.new(0,3,0.5,-9)}):Play() end
     end
-end
-
-local function stopMovement()
-    local myHRP = hrp()
-    if myHRP then
-        local bv = myHRP:FindFirstChild("HeckesFollowBV")
-        if bv then bv:Destroy() end
-    end
-end
-
-local function moveTowards(myHRP, pos)
-    local dir = (pos - myHRP.Position).Unit
-    local bv = myHRP:FindFirstChild("HeckesFollowBV")
-    if not bv then
-        bv = Instance.new("BodyVelocity", myHRP)
-        bv.Name = "HeckesFollowBV"
-        bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
-    end
-    bv.Velocity = Vector3.new(dir.X * FOLLOW_SPEED, myHRP.Velocity.Y, dir.Z * FOLLOW_SPEED)
-    local look = Vector3.new(pos.X, myHRP.Position.Y, pos.Z)
-    myHRP.CFrame = CFrame.new(myHRP.Position, look)
-end
-
--- ===== FOLLOW LOOP =====
-local followConn
-local function startFollow()
-    if followConn then followConn:Disconnect() end
-    followConn = RunService.Heartbeat:Connect(function()
-        local h = hum()
-        local myHRP = hrp()
-        if not h or not myHRP then return end
-        
-        if C.AutoRecord and target then
-            local tHRP = targetHRP()
-            if tHRP then recordWaypoint(tHRP.Position) end
-        end
-        
-        if not C.FollowMode then return end
-        if not target then return end
-        
-        local tHRP = targetHRP()
-        if not tHRP then stopMovement(); return end
-        
-        local distToTarget = (myHRP.Position - tHRP.Position).Magnitude
-        
-        if distToTarget <= MAX_DIST then
-            if not STOPPED then
-                stopMovement()
-                STOPPED = true
-            end
-            return
-        end
-        
-        STOPPED = false
-        
-        if #waypoints > 0 and followIdx <= #waypoints then
-            local nextWP = waypoints[followIdx]
-            local distWP = (myHRP.Position - nextWP).Magnitude
-            
-            if distWP < 2 then
-                followIdx = followIdx + 1
-            else
-                local distFromWPToTarget = (nextWP - tHRP.Position).Magnitude
-                if distFromWPToTarget > distToTarget + 5 then
-                    followIdx = followIdx + 1
-                else
-                    moveTowards(myHRP, nextWP)
-                    return
-                end
-            end
-        end
-        
-        moveTowards(myHRP, tHRP.Position)
-    end)
-end
-
-local function stopFollow()
-    if followConn then followConn:Disconnect(); followConn = nil end
-    stopMovement()
-    STOPPED = false
-end
-
--- ===== TOGGLE =====
-local toggleRefs = {}
-local function createToggle(parent, order, label, key, callback)
-    local row = Instance.new("Frame", parent); row.Size = UDim2.new(1, -12, 0, 36)
-    row.BackgroundColor3 = Color3.fromRGB(35, 35, 50); row.BorderSizePixel = 0; row.LayoutOrder = order
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
-    local lb = Instance.new("TextLabel", row); lb.Size = UDim2.new(0.65, 0, 1, 0); lb.Position = UDim2.new(0, 10, 0, 0)
-    lb.BackgroundTransparency = 1; lb.Text = label; lb.TextColor3 = Color3.fromRGB(230, 230, 230)
-    lb.TextScaled = true; lb.Font = Enum.Font.Gotham; lb.TextXAlignment = Enum.TextXAlignment.Left
-    local sw = Instance.new("Frame", row); sw.Size = UDim2.new(0, 46, 0, 24); sw.Position = UDim2.new(1, -56, 0.5, -12)
-    sw.BackgroundColor3 = Color3.fromRGB(80, 40, 40); sw.BorderSizePixel = 0
-    Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
-    local kn = Instance.new("Frame", sw); kn.Size = UDim2.new(0, 18, 0, 18); kn.Position = UDim2.new(0, 3, 0.5, -9)
-    kn.BackgroundColor3 = Color3.new(1, 1, 1); kn.BorderSizePixel = 0
-    Instance.new("UICorner", kn).CornerRadius = UDim.new(1, 0)
-    local btn = Instance.new("TextButton", row); btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1; btn.Text = ""; btn.ZIndex = 5
-    toggleRefs[key] = {sw = sw, kn = kn}
-    local function setVisual(on)
-        if on then
-            TweenService:Create(sw, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 180, 80)}):Play()
-            TweenService:Create(kn, TweenInfo.new(0.2), {Position = UDim2.new(1, -21, 0.5, -9)}):Play()
-        else
-            TweenService:Create(sw, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 40, 40)}):Play()
-            TweenService:Create(kn, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -9)}):Play()
-        end
-    end
-    toggleRefs[key].setVisual = setVisual
-    setVisual(C[key])
+    tRefs[key]={sv=sv}; sv(C[key])
     btn.MouseButton1Click:Connect(function()
-        local ns = not C[key]
-        local ok, res = pcall(callback, ns)
-        if ok and res ~= false then
-            C[key] = ns; setVisual(ns)
-            print("[Toggle] " .. label .. " -> " .. (ns and "ON" or "OFF"))
-        else
-            C[key] = false; setVisual(false)
-            print("[Toggle] " .. label .. " GAGAL!")
-        end
+        local ns=not C[key]; local ok,res=pcall(cb,ns)
+        if ok and res~=false then C[key]=ns; sv(ns) else C[key]=false; sv(false) end
     end)
 end
 
--- ===== DISTANCE ADJUSTER (BARU) =====
-local distLabel
-local function createDistanceControl(parent, order)
-    local row = Instance.new("Frame", parent); row.Size = UDim2.new(1, -12, 0, 42)
-    row.BackgroundColor3 = Color3.fromRGB(35, 35, 50); row.BorderSizePixel = 0; row.LayoutOrder = order
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
-    
-    -- Label kiri
-    local lb = Instance.new("TextLabel", row); lb.Size = UDim2.new(0.45, 0, 1, 0); lb.Position = UDim2.new(0, 10, 0, 0)
-    lb.BackgroundTransparency = 1; lb.Text = "📏 Jarak Max"; lb.TextColor3 = Color3.fromRGB(230, 230, 230)
-    lb.TextScaled = true; lb.Font = Enum.Font.Gotham; lb.TextXAlignment = Enum.TextXAlignment.Left
-    
-    -- Tombol minus
-    local minusBtn = Instance.new("TextButton", row); minusBtn.Size = UDim2.new(0, 26, 0, 26)
-    minusBtn.Position = UDim2.new(1, -132, 0.5, -13); minusBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-    minusBtn.BorderSizePixel = 0; minusBtn.Text = "-"; minusBtn.TextColor3 = Color3.new(1, 1, 1)
-    minusBtn.TextScaled = true; minusBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 4)
-    
-    -- Value label
-    distLabel = Instance.new("TextLabel", row); distLabel.Size = UDim2.new(0, 50, 0, 26)
-    distLabel.Position = UDim2.new(1, -102, 0.5, -13); distLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    distLabel.BorderSizePixel = 0; distLabel.Text = tostring(MAX_DIST)
-    distLabel.TextColor3 = Color3.fromRGB(0, 255, 150); distLabel.TextScaled = true
-    distLabel.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", distLabel).CornerRadius = UDim.new(0, 4)
-    
-    -- Tombol plus
-    local plusBtn = Instance.new("TextButton", row); plusBtn.Size = UDim2.new(0, 26, 0, 26)
-    plusBtn.Position = UDim2.new(1, -46, 0.5, -13); plusBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
-    plusBtn.BorderSizePixel = 0; plusBtn.Text = "+"; plusBtn.TextColor3 = Color3.new(1, 1, 1)
-    plusBtn.TextScaled = true; plusBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 4)
-    
-    -- Event
-    minusBtn.MouseButton1Click:Connect(function()
-        MAX_DIST = math.max(1, MAX_DIST - 1)
-        distLabel.Text = tostring(MAX_DIST)
-        print("[Distance] Jarak max: " .. MAX_DIST)
-    end)
-    plusBtn.MouseButton1Click:Connect(function()
-        MAX_DIST = math.min(20, MAX_DIST + 1)
-        distLabel.Text = tostring(MAX_DIST)
-        print("[Distance] Jarak max: " .. MAX_DIST)
-    end)
+local mGui,statusL,listP
+local function ctrlRow(par,ord,lbl,col,getV,setV,step,mn,mx)
+    local row=Instance.new("Frame",par); row.Size=UDim2.new(1,-12,0,42); row.BackgroundColor3=Color3.fromRGB(35,35,50); row.BorderSizePixel=0; row.LayoutOrder=ord; Instance.new("UICorner",row).CornerRadius=UDim.new(0,6)
+    local lb=Instance.new("TextLabel",row); lb.Size=UDim2.new(0.45,0,1,0); lb.Position=UDim2.new(0,10,0,0); lb.BackgroundTransparency=1; lb.Text=lbl; lb.TextColor3=Color3.fromRGB(230,230,230); lb.TextScaled=true; lb.Font=Enum.Font.Gotham; lb.TextXAlignment=Enum.TextXAlignment.Left
+    local mb=Instance.new("TextButton",row); mb.Size=UDim2.new(0,26,0,26); mb.Position=UDim2.new(1,-132,0.5,-13); mb.BackgroundColor3=Color3.fromRGB(180,60,60); mb.BorderSizePixel=0; mb.Text="-"; mb.TextColor3=Color3.new(1,1,1); mb.TextScaled=true; mb.Font=Enum.Font.GothamBold; Instance.new("UICorner",mb).CornerRadius=UDim.new(0,4)
+    local vl=Instance.new("TextLabel",row); vl.Size=UDim2.new(0,50,0,26); vl.Position=UDim2.new(1,-102,0.5,-13); vl.BackgroundColor3=Color3.fromRGB(40,40,55); vl.BorderSizePixel=0; vl.Text=tostring(getV()); vl.TextColor3=col; vl.TextScaled=true; vl.Font=Enum.Font.GothamBold; Instance.new("UICorner",vl).CornerRadius=UDim.new(0,4)
+    local pb=Instance.new("TextButton",row); pb.Size=UDim2.new(0,26,0,26); pb.Position=UDim2.new(1,-46,0.5,-13); pb.BackgroundColor3=Color3.fromRGB(50,180,80); pb.BorderSizePixel=0; pb.Text="+"; pb.TextColor3=Color3.new(1,1,1); pb.TextScaled=true; pb.Font=Enum.Font.GothamBold; Instance.new("UICorner",pb).CornerRadius=UDim.new(0,4)
+    mb.MouseButton1Click:Connect(function() setV(math.max(mn,getV()-step)); vl.Text=tostring(getV()) end)
+    pb.MouseButton1Click:Connect(function() setV(math.min(mx,getV()+step)); vl.Text=tostring(getV()) end)
 end
 
--- ===== GUI =====
-local mainGui, statusLbl, playerList
-local function buildGUI()
-    mainGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-    mainGui.ResetOnSpawn = false; mainGui.DisplayOrder = 5
-    local f = Instance.new("Frame", mainGui); f.Size = UDim2.new(0, 280, 0, 510)
-    f.Position = UDim2.new(0.5, -140, 0.5, -255); f.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    f.BorderSizePixel = 0; f.Active = true; f.Draggable = true
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-    local hdr = Instance.new("Frame", f); hdr.Size = UDim2.new(1, 0, 0, 42)
-    hdr.BackgroundColor3 = Color3.fromRGB(0, 180, 100); hdr.BorderSizePixel = 0
-    Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 10)
-    local ti = Instance.new("TextLabel", hdr); ti.Size = UDim2.new(1, 0, 1, 0)
-    ti.BackgroundTransparency = 1; ti.Text = "FOLLOW TRAIL - Heckes 15"; ti.TextColor3 = Color3.new(1, 1, 1)
-    ti.TextScaled = true; ti.Font = Enum.Font.GothamBold
+local function forceOffAll() for _,k in ipairs({"Record","Trail","Jump","Fly"}) do C[k]=false; if tRefs[k] then tRefs[k].sv(false) end end end
 
-    statusLbl = Instance.new("TextLabel", f); statusLbl.Size = UDim2.new(1, 0, 0, 22)
-    statusLbl.Position = UDim2.new(0, 0, 0, 48); statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = "Target: Belum dipilih"; statusLbl.TextColor3 = Color3.fromRGB(255, 200, 0)
-    statusLbl.TextScaled = true; statusLbl.Font = Enum.Font.GothamBold
+local function build()
+    mGui=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui")); mGui.ResetOnSpawn=false; mGui.DisplayOrder=5
+    local f=Instance.new("Frame",mGui); f.Size=UDim2.new(0,280,0,600); f.Position=UDim2.new(0.5,-140,0.5,-300); f.BackgroundColor3=Color3.fromRGB(20,20,30); f.BorderSizePixel=0; f.Active=true; f.Draggable=true; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+    local hd=Instance.new("Frame",f); hd.Size=UDim2.new(1,0,0,42); hd.BackgroundColor3=Color3.fromRGB(0,180,100); hd.BorderSizePixel=0; Instance.new("UICorner",hd).CornerRadius=UDim.new(0,10)
+    local ti=Instance.new("TextLabel",hd); ti.Size=UDim2.new(1,0,1,0); ti.BackgroundTransparency=1; ti.Text="MIMIC FOLLOW - H15"; ti.TextColor3=Color3.new(1,1,1); ti.TextScaled=true; ti.Font=Enum.Font.GothamBold
+    statusL=Instance.new("TextLabel",f); statusL.Size=UDim2.new(1,0,0,22); statusL.Position=UDim2.new(0,0,0,48); statusL.BackgroundTransparency=1; statusL.Text="Target: -"; statusL.TextColor3=Color3.fromRGB(255,200,0); statusL.TextScaled=true; statusL.Font=Enum.Font.GothamBold
 
-    local listLbl = Instance.new("TextLabel", f); listLbl.Size = UDim2.new(1, 0, 0, 18)
-    listLbl.Position = UDim2.new(0, 0, 0, 72); listLbl.BackgroundTransparency = 1
-    listLbl.Text = "Pilih Player (klik nama):"; listLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-    listLbl.TextScaled = true; listLbl.Font = Enum.Font.Gotham
+    listP=Instance.new("ScrollingFrame",f); listP.Size=UDim2.new(0.9,0,0,130); listP.Position=UDim2.new(0.05,0,0,74); listP.BackgroundColor3=Color3.fromRGB(30,30,45); listP.BorderSizePixel=0; listP.ScrollBarThickness=4; listP.CanvasSize=UDim2.new(); listP.AutomaticCanvasSize=Enum.AutomaticSize.Y; Instance.new("UICorner",listP).CornerRadius=UDim.new(0,6)
+    Instance.new("UIListLayout",listP).Padding=UDim.new(0,4)
+    local pd=Instance.new("UIPadding",listP); pd.PaddingTop=UDim.new(0,5); pd.PaddingLeft=UDim.new(0,5); pd.PaddingRight=UDim.new(0,5)
 
-    playerList = Instance.new("ScrollingFrame", f); playerList.Size = UDim2.new(0.9, 0, 0, 130)
-    playerList.Position = UDim2.new(0.05, 0, 0, 94); playerList.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    playerList.BorderSizePixel = 0; playerList.ScrollBarThickness = 4
-    playerList.CanvasSize = UDim2.new(0, 0, 0, 0); playerList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Instance.new("UICorner", playerList).CornerRadius = UDim.new(0, 6)
-    local ly = Instance.new("UIListLayout", playerList); ly.Padding = UDim.new(0, 4); ly.SortOrder = Enum.SortOrder.LayoutOrder
-    local pad = Instance.new("UIPadding", playerList); pad.PaddingTop = UDim.new(0, 5); pad.PaddingLeft = UDim.new(0, 5); pad.PaddingRight = UDim.new(0, 5)
-
-    local function refreshList()
-        for _, c in ipairs(playerList:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-        local count = 0
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP then
-                count = count + 1
-                local b = Instance.new("TextButton", playerList); b.Size = UDim2.new(1, -10, 0, 28)
-                b.BackgroundColor3 = Color3.fromRGB(50, 50, 70); b.BorderSizePixel = 0; b.Text = p.Name
-                b.TextColor3 = Color3.new(1, 1, 1); b.TextScaled = true; b.Font = Enum.Font.Gotham
-                b.LayoutOrder = count
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+    local function refresh()
+        for _,c in ipairs(listP:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+        local n=0
+        for _,p in ipairs(P:GetPlayers()) do
+            if p~=LP then
+                n=n+1
+                local b=Instance.new("TextButton",listP)
+                b.Size=UDim2.new(1,-10,0,28); b.BackgroundColor3=Color3.fromRGB(50,50,70)
+                b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1)
+                b.TextScaled=false; b.TextSize=13
+                b.Font=Enum.Font.Gotham; b.LayoutOrder=n
+                b.Text=string.format("%s (@%s)", p.DisplayName, p.Name)
+                Instance.new("UICorner",b).CornerRadius=UDim.new(0,4)
                 b.MouseButton1Click:Connect(function()
-                    for _, c in ipairs(playerList:GetChildren()) do
-                        if c:IsA("TextButton") then c.BackgroundColor3 = Color3.fromRGB(50, 50, 70) end
-                    end
-                    b.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
-                    target = p
-                    statusLbl.Text = "Target: " .. p.Name
-                    statusLbl.TextColor3 = Color3.fromRGB(0, 255, 150)
-                    waypoints = {}; lastRecordPos = nil; followIdx = 1; STOPPED = false
-                    clearTrailVisual()
+                    for _,c in ipairs(listP:GetChildren()) do if c:IsA("TextButton") then c.BackgroundColor3=Color3.fromRGB(50,50,70) end end
+                    b.BackgroundColor3=Color3.fromRGB(0,180,100)
+                    tgt=p
+                    statusL.Text="Target: "..p.DisplayName.." (@"..p.Name..")"
+                    statusL.TextColor3=Color3.fromRGB(0,255,150)
+                    wps={}; lastWP=nil; fIdx=1; stopped=false; clearT()
                 end)
             end
         end
-        if count == 0 then
-            local e = Instance.new("TextLabel", playerList); e.Size = UDim2.new(1, -10, 0, 28)
-            e.BackgroundTransparency = 1; e.Text = "Tidak ada player lain"
-            e.TextColor3 = Color3.fromRGB(150, 150, 150); e.TextScaled = true; e.Font = Enum.Font.Gotham
+        if n==0 then
+            local e=Instance.new("TextLabel",listP); e.Size=UDim2.new(1,-10,0,28)
+            e.BackgroundTransparency=1; e.Text="Tidak ada player lain"
+            e.TextColor3=Color3.fromRGB(150,150,150); e.TextScaled=true; e.Font=Enum.Font.Gotham
         end
     end
-    refreshList()
-    Players.PlayerAdded:Connect(function() task.wait(0.5); refreshList() end)
-    Players.PlayerRemoving:Connect(function(p)
-        if target == p then
-            target = nil; STOPPED = false
-            statusLbl.Text = "Target: Belum dipilih"; statusLbl.TextColor3 = Color3.fromRGB(255,200,0)
+    refresh()
+    P.PlayerAdded:Connect(function() task.wait(0.5); refresh() end)
+    P.PlayerRemoving:Connect(function(p)
+        if tgt==p then tgt=nil; statusL.Text="Target: -"; statusL.TextColor3=Color3.fromRGB(255,200,0) end
+        task.wait(0.1); refresh()
+    end)
+
+    local sc=Instance.new("ScrollingFrame",f); sc.Size=UDim2.new(1,-10,0,330); sc.Position=UDim2.new(0,5,0,212); sc.BackgroundTransparency=1; sc.BorderSizePixel=0; sc.ScrollBarThickness=4; sc.CanvasSize=UDim2.new(); sc.AutomaticCanvasSize=Enum.AutomaticSize.Y
+    Instance.new("UIListLayout",sc).Padding=UDim.new(0,5)
+
+    mkTog(sc,1,"🚶 Follow (MASTER)","Follow",function(on)
+        if on then
+            if not tgt then return false end
+            stopped=false; start()
+        else
+            forceOffAll(); stop(); clearT(); lastWP=nil; wps={}; fIdx=1
         end
-        task.wait(0.1); refreshList()
-    end)
-
-    local sc = Instance.new("ScrollingFrame", f); sc.Size = UDim2.new(1, -10, 0, 230)
-    sc.Position = UDim2.new(0, 5, 0, 232); sc.BackgroundTransparency = 1; sc.BorderSizePixel = 0
-    sc.ScrollBarThickness = 4; sc.CanvasSize = UDim2.new(0, 0, 0, 0)
-    sc.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    local ly2 = Instance.new("UIListLayout", sc); ly2.Padding = UDim.new(0, 5); ly2.SortOrder = Enum.SortOrder.LayoutOrder
-
-    createToggle(sc, 1, "🚶 Follow Mode", "FollowMode", function(on)
-        if on and not target then return false end
-        if on then STOPPED = false; startFollow() else stopFollow() end
         return true
     end)
-    createToggle(sc, 2, "📝 Auto Record", "AutoRecord", function(on)
-        if on and not target then return false end
-        if not on then lastRecordPos = nil end
-        return true
-    end)
-    createToggle(sc, 3, "👁️ Show Trail", "ShowTrail", function(on)
-        if not on then clearTrailVisual() end
-        return true
-    end)
-    
-    -- Distance control
-    createDistanceControl(sc, 4)
+    mkTog(sc,2,"📝 Record","Record",function(on) if on and not tgt then return false end if not on then lastWP=nil end return true end)
+    mkTog(sc,3,"👁️ Trail","Trail",function(on) if not on then clearT() end return true end)
+    mkTog(sc,4,"🦘 Mimic Jump","Jump",function() return true end)
+    mkTog(sc,5,"🕊️ Mimic Fly","Fly",function() return true end)
+    ctrlRow(sc,6,"📏 Jarak Stop",Color3.fromRGB(0,255,150),function() return MAX end,function(v) MAX=v end,1,1,20)
+    ctrlRow(sc,7,"⚡ Jarak Teleport",Color3.fromRGB(255,200,100),function() return TELD end,function(v) TELD=v end,TELSTEP,TELMIN,TELMAX)
 
-    local clearBtn = Instance.new("TextButton", sc); clearBtn.Size = UDim2.new(1, -12, 0, 34)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60); clearBtn.BorderSizePixel = 0
-    clearBtn.Text = "🗑️ Clear Waypoints"; clearBtn.TextColor3 = Color3.new(1, 1, 1)
-    clearBtn.TextScaled = true; clearBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 6)
-    clearBtn.MouseButton1Click:Connect(function()
-        waypoints = {}; lastRecordPos = nil; followIdx = 1; STOPPED = false; clearTrailVisual()
-        print("[Follow] Waypoints dibersihkan!")
-    end)
-
-    local cls = Instance.new("TextButton", f); cls.Size = UDim2.new(0.9, 0, 0, 26)
-    cls.Position = UDim2.new(0.05, 0, 1, -32); cls.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    cls.BorderSizePixel = 0; cls.Text = "▼ Sembunyikan GUI"; cls.TextColor3 = Color3.fromRGB(200, 200, 200)
-    cls.TextScaled = true; cls.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", cls).CornerRadius = UDim.new(0, 6)
-    cls.MouseButton1Click:Connect(function() mainGui.Enabled = false end)
+    local cb=Instance.new("TextButton",sc); cb.Size=UDim2.new(1,-12,0,34); cb.BackgroundColor3=Color3.fromRGB(180,60,60); cb.BorderSizePixel=0; cb.Text="🗑️ Clear"; cb.TextColor3=Color3.new(1,1,1); cb.TextScaled=true; cb.Font=Enum.Font.GothamBold; Instance.new("UICorner",cb).CornerRadius=UDim.new(0,6)
+    cb.MouseButton1Click:Connect(function() wps={}; lastWP=nil; fIdx=1; stopped=false; clearT() end)
+    local cl=Instance.new("TextButton",f); cl.Size=UDim2.new(0.9,0,0,26); cl.Position=UDim2.new(0.05,0,1,-32); cl.BackgroundColor3=Color3.fromRGB(50,50,70); cl.BorderSizePixel=0; cl.Text="▼ Hide"; cl.TextColor3=Color3.fromRGB(200,200,200); cl.TextScaled=true; cl.Font=Enum.Font.GothamBold; Instance.new("UICorner",cl).CornerRadius=UDim.new(0,6)
+    cl.MouseButton1Click:Connect(function() mGui.Enabled=false end)
 end
 
--- ===== IKON =====
 local function buildIcon()
-    local ig = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-    ig.ResetOnSpawn = false; ig.DisplayOrder = 10
-    local b = Instance.new("TextButton", ig); b.Size = UDim2.new(0, 52, 0, 52)
-    b.Position = UDim2.new(0, 15, 0.5, -26); b.BackgroundColor3 = Color3.fromRGB(0, 200, 120)
-    b.BorderSizePixel = 0; b.Text = "H15"; b.TextColor3 = Color3.new(1, 1, 1)
-    b.TextScaled = true; b.Font = Enum.Font.GothamBlack; b.AutoButtonColor = false; b.Active = true
-    Instance.new("UICorner", b).CornerRadius = UDim.new(1, 0)
-    local st = Instance.new("UIStroke", b); st.Color = Color3.new(1, 1, 1); st.Thickness = 2; st.Transparency = 0.3
-    local dragging, dragStart, startPos, moved = false, nil, nil, false
-    b.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; moved = false; dragStart = i.Position; startPos = b.Position end end)
-    UIS.InputChanged:Connect(function(i) if not dragging then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
-            local d = i.Position - dragStart
-            if math.abs(d.X) > 8 or math.abs(d.Y) > 8 then moved = true end
-            if moved then b.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y) end
-        end end)
-    UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        if dragging and not moved and mainGui then mainGui.Enabled = not mainGui.Enabled end
-        dragging = false; moved = false end end)
+    local ig=Instance.new("ScreenGui",LP:WaitForChild("PlayerGui")); ig.ResetOnSpawn=false; ig.DisplayOrder=10
+    local b=Instance.new("TextButton",ig); b.Size=UDim2.new(0,52,0,52); b.Position=UDim2.new(0,15,0.5,-26); b.BackgroundColor3=Color3.fromRGB(0,200,120); b.BorderSizePixel=0; b.Text="H15"; b.TextColor3=Color3.new(1,1,1); b.TextScaled=true; b.Font=Enum.Font.GothamBlack; b.AutoButtonColor=false; b.Active=true; Instance.new("UICorner",b).CornerRadius=UDim.new(1,0)
+    local st=Instance.new("UIStroke",b); st.Color=Color3.new(1,1,1); st.Thickness=2; st.Transparency=0.3
+    local dg,ds,sp,mv=false,nil,nil,false
+    b.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dg=true; mv=false; ds=i.Position; sp=b.Position end end)
+    UIS.InputChanged:Connect(function(i) if not dg then return end if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then local d=i.Position-ds; if math.abs(d.X)>8 or math.abs(d.Y)>8 then mv=true end if mv then b.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then if dg and not mv and mGui then mGui.Enabled=not mGui.Enabled end dg=false; mv=false end end)
 end
 
--- ===== JALANKAN =====
-intro(function()
-    buildGUI()
-    buildIcon()
-    print("[Heckes 15] Follow Trail loaded! Distance adjustable via GUI.")
-end)
+intro(function() build(); buildIcon() end)
